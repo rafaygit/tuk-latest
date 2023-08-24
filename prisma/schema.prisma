@@ -1,0 +1,240 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model users {
+  id            Int             @id @default(autoincrement())
+  email         String          @unique
+  firstName     String?
+  lastName      String?
+  password      String
+  role          UserRoles       @default(USER)
+  licenses      licenses[]
+  templates     templates[]
+  userMetas     userMetas[]
+  tickets       tickets[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  conversations conversations[]
+  transactions  transactions[]
+}
+
+model userMetas {
+  id        Int      @id @default(autoincrement())
+  key       String
+  value     String?
+  users     users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum UserRoles {
+  USER
+  ADMIN
+  SUPERADMIN
+}
+
+model tickets {
+  id            Int             @id @default(autoincrement())
+  subject       String
+  type          TicketTypes
+  status        TicketStatuses  @default(OPEN)
+  description   String?
+  user          users           @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+  requesterId   Int
+  conversations conversations[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+enum TicketTypes {
+  SUGGESTION
+  SUPPORT
+  BUG
+  OTHER
+}
+
+enum TicketStatuses {
+  OPEN
+  RESOLVED
+}
+
+model conversations {
+  id        Int      @id @default(autoincrement())
+  message   String
+  users     users    @relation(fields: [userId], references: [id])
+  userId    Int
+  tickets   tickets  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticketId  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model licenses {
+  id           Int            @id @default(autoincrement())
+  name         String
+  price        Float
+  description  String?
+  users        users[]
+  uiKits       uiKits[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  transactions transactions[]
+}
+
+model transactions {
+  id               Int                    @id @default(autoincrement())
+  method           PaymentGatewayProvider
+  paidStatus       Boolean                @default(false)
+  amount           Float
+  users            users?                 @relation(fields: [userId], references: [id], onDelete: SetNull) //attribute set to optional due to on delete null
+  userId           Int?
+  transactionMetas transactionMetas[]
+  templates        templates[]
+  licenses         licenses[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+}
+
+enum PaymentGatewayProvider {
+  STRIPE
+}
+
+model transactionMetas {
+  id            Int          @id @default(autoincrement())
+  key           String
+  value         String
+  transactions  transactions @relation(fields: [transactionId], references: [id])
+  transactionId Int
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model uiKits {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  description String?
+  parentUiKit uiKits?      @relation("ChildUiKits", fields: [parentId], references: [id])
+  parentId    Int?
+  subUiKits   uiKits[]     @relation("ChildUiKits")
+  licenses    licenses[]
+  categories  categories[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model categories {
+  id             Int          @id @default(autoincrement())
+  name           String
+  image          String?
+  description    String?
+  uiKits         uiKits       @relation(fields: [uiKitId], references: [id], onDelete: Cascade)
+  uiKitId        Int
+  parentCategory categories?  @relation("ChildCategories", fields: [parentId], references: [id])
+  parentId       Int?
+  subCategories  categories[] @relation("ChildCategories")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  components     components[]
+}
+
+model components {
+  id             Int                     @id @default(autoincrement())
+  name           String
+  description    String?
+  image          String?
+  tag            ComponentTags?            
+  accessType     ComponentAccessType     @default(PAID)
+  category       categories              @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId     Int
+  integrations   componentIntegrations[]
+  componentMetas componentMetas[]
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+}
+
+enum ComponentTags {
+  NEW
+  DEPRECIATED
+}
+enum ComponentAccessType {
+  PAID
+  FREE
+}
+
+model componentMetas {
+  id          Int        @id @default(autoincrement())
+  key         String
+  value       String?
+  components  components @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  componentId Int
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model componentIntegrations {
+  id          Int              @id @default(autoincrement())
+  type        IntegrationTypes
+  markup      String
+  codeJS      String?
+  components  components       @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  componentId Int
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+enum IntegrationTypes {
+  REACTJS
+  ANGULARJS
+  VUEJS
+  HTML
+}
+
+model templates {
+  id           Int                    @id @default(autoincrement())
+  name         String
+  price        Float
+  description  String?
+  image        String?
+  integrations templateIntegrations[]
+  users        users[]
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  transactions transactions[]
+}
+
+model templateIntegrations {
+  id         Int              @id @default(autoincrement())
+  type       IntegrationTypes
+  zipFile    String
+  templates  templates        @relation(fields: [templateId], references: [id],onDelete: Cascade)
+  templateId Int
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+}
+
+model blogs {
+  id        Int       @id @default(autoincrement())
+  author    String
+  slug      String
+  image     String?
+  type      BlogTypes
+  title     String
+  subTitle  String
+  content   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+enum BlogTypes {
+  OTHERS
+}
